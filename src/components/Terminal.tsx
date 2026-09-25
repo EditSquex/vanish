@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useTransition } from "react";
 import { Copy, Check, ArrowRightLeft, Sparkles, X, Minus, Plus, Pin } from "lucide-react";
 import { LanguageDropdown } from "./LanguageDropdown";
 import { translateText, TranslationResult } from "../services/translator";
@@ -42,8 +42,8 @@ export const TerminalPrompt: React.FC = () => {
     }
   }, []);
 
-  useEffect(() => {
-    const trimmed = sourceText.trim();
+  const triggerTranslation = (text: string, sLang: string, tLang: string, instant = false) => {
+    const trimmed = text.trim();
     if (!trimmed) {
       setResult(null);
       setLoading(false);
@@ -58,9 +58,11 @@ export const TerminalPrompt: React.FC = () => {
     abortControllerRef.current = controller;
 
     setLoading(true);
+    const delay = instant ? 0 : trimmed.length > 500 ? 120 : 40;
+
     const timeoutId = setTimeout(async () => {
       try {
-        const res = await translateText(trimmed, sourceLang, targetLang, controller.signal);
+        const res = await translateText(trimmed, sLang, tLang, controller.signal);
         setResult(res);
       } catch (err: any) {
         if (err.name !== "AbortError") {
@@ -69,13 +71,29 @@ export const TerminalPrompt: React.FC = () => {
       } finally {
         setLoading(false);
       }
-    }, 40);
+    }, delay);
 
     return () => {
       clearTimeout(timeoutId);
       controller.abort();
     };
+  };
+
+  useEffect(() => {
+    const cancel = triggerTranslation(sourceText, sourceLang, targetLang);
+    return () => {
+      if (cancel) cancel();
+    };
   }, [sourceText, sourceLang, targetLang]);
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const pasted = e.clipboardData.getData("text");
+    if (pasted) {
+      setTimeout(() => {
+        triggerTranslation(sourceText + pasted, sourceLang, targetLang, true);
+      }, 0);
+    }
+  };
 
   const handleCopy = async () => {
     const textToCopy = result?.translatedText || "";
@@ -157,6 +175,8 @@ export const TerminalPrompt: React.FC = () => {
     }
   };
 
+  const wordCount = sourceText.trim() ? sourceText.trim().split(/\s+/).length : 0;
+
   return (
     <div className="terminal-shell">
       <div className="terminal-header">
@@ -235,15 +255,18 @@ export const TerminalPrompt: React.FC = () => {
             <textarea
               ref={textareaRef}
               className="prompt-textarea"
-              placeholder="Type anything to translate in real-time..."
+              placeholder="Type or paste sentences or multi-line paragraphs in real-time... (Shift + Enter for new lines)"
               value={sourceText}
               onChange={(e) => setSourceText(e.target.value)}
               onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
               spellCheck={false}
               rows={2}
             />
             {sourceText.length > 0 && (
-              <span className="char-counter">{sourceText.length} chars</span>
+              <span className="char-counter">
+                {wordCount} words · {sourceText.length} chars
+              </span>
             )}
           </div>
         </div>
