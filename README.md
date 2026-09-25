@@ -4,7 +4,7 @@
 
   
 
-**The Zero-Latency, Privacy-First Terminal Prompt Translator.**
+**The Zero-Latency, Privacy-First Translator.**
 
 *Type freely. Translate keystroke-by-keystroke in milliseconds. Leaves zero trace.*
 
